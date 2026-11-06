@@ -66,6 +66,8 @@ input[type=range]{width:100%}
   <label>메인 텍스트 (2줄, 강조할 부분은 *별표*로 감싸기)</label>
   <textarea id="title">가을도 됐는데, 공연 봐야지
 강동에 오는 *‘두 남자 이야기’*</textarea>
+  <label>채널명</label>
+  <div class="seg row" id="brandSeg"><button data-v="포레온라이프" class="on">포레온라이프</button><button data-v="성수동라이프">성수동라이프</button></div>
   <label>분류</label>
   <div class="row">
     <input type="text" id="cat" value="NEWS" style="width:110px">
@@ -92,7 +94,7 @@ input[type=range]{width:100%}
   var W=1080,H=1350;
   var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
   var $=function(id){return document.getElementById(id)};
-  var state={img:null,pos:'top',color:'#FF9A3C'};
+  var state={img:null,pos:'top',color:'#FF9A3C',brand:'포레온라이프'};
   var COLORS=['#FF9A3C','#FFE600','#B7F06B','#D9D4A8','#FFFFFF'];
   var BASE="'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif";
   function fEB(sz){return sz+"px 'NeoEB',"+BASE}
@@ -115,6 +117,7 @@ input[type=range]{width:100%}
     });
   }
   seg('posSeg',function(v){state.pos=v});
+  seg('brandSeg',function(v){state.brand=v});
   seg('catSeg',function(v){$('cat').value=v});
 
   ['title','cat','zoom','px','py','shade'].forEach(function(id){$(id).addEventListener('input',draw)});
@@ -178,7 +181,7 @@ input[type=range]{width:100%}
     drawTitleLine(lines[1]||'',1099.5);
     var ly=state.pos==='top'?896:1196;
     ctx.font=fSB(40);
-    tracked('\ud3ec\ub808\uc628\ub77c\uc774\ud504',84.8,ly,-90/1000*40,'#FFFFFF');
+    tracked(state.brand,84.8,ly,-90/1000*40,'#FFFFFF');
     ctx.fillStyle='#FFFFFF';
     ctx.fillText('|',283,ly);
     ctx.fillText($('cat').value||'',303,ly);
