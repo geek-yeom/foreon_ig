@@ -193,9 +193,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   <label>강조 색상</label>
   <div class="row" id="colors"></div>
   <div id="seongsuGradient" hidden>
-    <label>그라데이션 시작점 · 투명 <output id="shadeStartValue">850px</output></label><input type="range" id="shadeStart" min="0" max="1349" step="1" value="850">
-    <label>그라데이션 끝점 · 검정 <output id="shadeEndValue">1350px</output></label><input type="range" id="shadeEnd" min="1" max="1350" step="1" value="1350">
-    <div class="hint">시작점 위는 원본 그대로, 시작점부터 끝점까지 일정하게 어두워지고 끝점 아래는 같은 농도로 유지됩니다. 좌표는 이미지 맨 위가 0px, 맨 아래가 1350px입니다.</div>
+    <button type="button" class="btn" id="resetGradient">포토샵 기준값 · 60%</button>
+    <label>그라데이션 시작점 · 투명 <output id="shadeStartValue">840px</output></label><input type="range" id="shadeStart" min="0" max="1349" step="1" value="840">
+    <label>그라데이션 끝점 · 검정 <output id="shadeEndValue">1005px</output></label><input type="range" id="shadeEnd" min="1" max="1350" step="1" value="1005">
+    <div class="hint">포토샵 작업창을 참고한 기본값입니다. 짧은 구간에서 부드럽게 어두워진 뒤 아래쪽은 일정한 농도로 유지됩니다. 좌표는 이미지 맨 위가 0px, 맨 아래가 1350px입니다.</div>
   </div>
   <label><span id="shadeLabel">하단 어둡기</span> <output id="shadeValue">70%</output></label><input type="range" id="shade" min="0" max="100" value="70">
 </div>
@@ -265,6 +266,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   $('cat').addEventListener('input',function(){categories[state.brand]=this.value;refreshCategories()});
   refreshCategories();
 
+  $('resetGradient').addEventListener('click',function(){
+    $('shadeStart').value=840;$('shadeEnd').value=1005;$('shade').value=60;
+    opacityByBrand['성수동라이프']=60;draw();
+  });
   ['shadeStart','shadeEnd'].forEach(function(id){$(id).addEventListener('input',function(){
     if(Number($('shadeStart').value)>=Number($('shadeEnd').value)){
       if(id==='shadeStart')$('shadeEnd').value=Number(this.value)+1;
@@ -299,8 +304,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       var end=Number($('shadeEnd').value);
       $('shadeEndValue').value=end+'px';
       var gradient=ctx.createLinearGradient(0,start,0,end);
-      gradient.addColorStop(0,'rgba(0,0,0,0)');
-      gradient.addColorStop(1,'rgba(0,0,0,'+a+')');
+      // Smooth interpolation approximates the transition shown in the Photoshop mask.
+      for(var i=0;i<=64;i++){
+        var t=i/64,mask=t*t*(3-2*t);
+        gradient.addColorStop(t,'rgba(0,0,0,'+(a*mask)+')');
+      }
       ctx.fillStyle=gradient;ctx.fillRect(0,start,W,H-start);
       return;
     }
