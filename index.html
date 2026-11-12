@@ -207,6 +207,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <input type="text" id="cat" value="NEWS" style="width:110px">
     <div class="seg row" id="catSeg"><button data-v="NEWS" class="on">NEWS</button><button data-v="STORE">STORE</button><button data-v="EVENT">EVENT</button><button data-v="KIDS">KIDS</button><button data-v="FOOD">FOOD</button><button data-v="CAFE">CAFE</button><button data-v="POP-UP STORY">POP-UP STORY</button></div>
   </div>
+  <label for="englishTracking">영문 자간 <output id="englishTrackingValue">0</output></label>
+  <input type="range" id="englishTracking" min="-55" max="0" step="1" value="0" style="touch-action:none;height:44px">
+  <div class="hint">메인·서브 텍스트의 영어 단어에만 적용됩니다. 0은 기본 간격, -55는 좁은 간격입니다.</div>
   <label id="posLabel">분류 위치</label>
   <div class="seg row" id="posSeg"><button data-v="top" class="on">위</button><button data-v="bottom">아래</button></div>
 </div>
@@ -324,7 +327,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     function stop(){range.removeEventListener('pointermove',move);range.removeEventListener('pointerup',stop);range.removeEventListener('pointercancel',stop)}
     this.addEventListener('pointerup',stop);this.addEventListener('pointercancel',stop);
   });
-  ['title','cat','zoom','px','py','shade','shadeStart','shadeEnd'].forEach(function(id){$(id).addEventListener('input',draw)});
+  ['title','cat','zoom','px','py','shade','shadeStart','shadeEnd','englishTracking'].forEach(function(id){$(id).addEventListener('input',draw)});
 
   $('file').addEventListener('change',function(e){
     var f=e.target.files&&e.target.files[0];if(!f)return;
@@ -378,6 +381,19 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   }
 
   function tracked(text,x,y,sp,color){
+    var runs=text.match(/[A-Za-z]+|[^A-Za-z]+/g)||[];
+    var size=Number((ctx.font.match(/([\d.]+)px/)||[])[1])||40;
+    runs.forEach(function(run){
+      var english=/^[A-Za-z]+$/.test(run);
+      var tracking=english?Number($('englishTracking').value)/1000*size:sp;
+      x=trackedRun(run,x,y,tracking,color);
+      // Only spacing inside an English word changes; keep its boundary gap.
+      if(english)x+=sp-tracking;
+    });
+    return x;
+  }
+
+  function trackedRun(text,x,y,sp,color){
     if(state.brand==='성수동라이프' && 'letterSpacing' in ctx){
       var spacing=ctx.letterSpacing,kerning=ctx.fontKerning;
       ctx.letterSpacing=sp+'px';ctx.fontKerning='none';ctx.fillStyle=color;
@@ -405,6 +421,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   }
 
   function draw(){
+    $('englishTrackingValue').value=$('englishTracking').value;
     $('save').textContent=state.img?'이미지 저장':'투명 PNG 저장';
     $('gradientRange').style.setProperty('--start',(Number($('shadeStart').value)/1350*100)+'%');
     $('gradientRange').style.setProperty('--end',(Number($('shadeEnd').value)/1350*100)+'%');
@@ -425,7 +442,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     tracked(state.brand,84.8,ly,-90/1000*40,'#FFFFFF');
     ctx.fillStyle='#FFFFFF';
     ctx.fillText('|',283,ly);
-    ctx.fillText($('cat').value||'',303,ly);
+    tracked($('cat').value||'',303,ly,0,'#FFFFFF');
   }
 
   fontReady=Promise.all([document.fonts.load("72px 'NeoEB'",'가'),document.fonts.load("36px 'NeoSB'",'가'),document.fonts.load("700 70px 'SeongsuBold'",'가'),document.fonts.load("36.78px 'SeongsuMedium'",'성수동라이프')]).then(draw,draw);
