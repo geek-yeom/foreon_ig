@@ -355,9 +355,13 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       // Smooth interpolation approximates the transition shown in the Photoshop mask.
       for(var i=0;i<=64;i++){
         var t=i/64,mask=t*t*(3-2*t);
-        gradient.addColorStop(t,'rgba(0,0,0,'+(a*mask)+')');
+        gradient.addColorStop(t,'rgba(0,0,0,'+mask+')');
       }
-      ctx.fillStyle=gradient;ctx.fillRect(0,start,W,H-start);
+      // Mask defines coverage; globalAlpha controls the entire black layer.
+      ctx.save();
+      ctx.globalAlpha=a;
+      ctx.fillStyle=gradient;ctx.fillRect(0,0,W,H);
+      ctx.restore();
       return;
     }
     var g=ctx.createLinearGradient(0,600,0,H);
