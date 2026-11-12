@@ -192,6 +192,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 <div class="panel" id="p3">
   <label>강조 색상</label>
   <div class="row" id="colors"></div>
+  <div id="seongsuGradient" hidden><label>그라데이션 시작 높이 <output id="shadeStartValue">850px</output></label><input type="range" id="shadeStart" min="700" max="1100" step="10" value="850"><div class="hint">값이 클수록 아래쪽에만 그라데이션이 적용됩니다.</div></div>
   <label>하단 어둡기</label><input type="range" id="shade" min="0" max="100" value="70">
 </div>
 
@@ -239,6 +240,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     document.querySelector('.top h1').textContent=document.title;
     [].forEach.call($('modeSeg').children,function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v))});
     var seongsu=v==='성수동라이프';
+    $('seongsuGradient').hidden=!seongsu;
     $('posLabel').hidden=seongsu;$('posSeg').hidden=seongsu;
     $('posSeg').style.display=seongsu?'none':'';
     refreshCategories();
@@ -255,7 +257,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   $('cat').addEventListener('input',function(){categories[state.brand]=this.value;refreshCategories()});
   refreshCategories();
 
-  ['title','cat','zoom','px','py','shade'].forEach(function(id){$(id).addEventListener('input',draw)});
+  ['title','cat','zoom','px','py','shade','shadeStart'].forEach(function(id){$(id).addEventListener('input',draw)});
 
   $('file').addEventListener('change',function(e){
     var f=e.target.files&&e.target.files[0];if(!f)return;
@@ -276,6 +278,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
   function drawShade(){
     var a=$('shade').value/100;
+    if(state.brand==='성수동라이프'){
+      var start=Number($('shadeStart').value);
+      $('shadeStartValue').value=start+'px';
+      var gradient=ctx.createLinearGradient(0,start,0,H);
+      gradient.addColorStop(0,'rgba(0,0,0,0)');
+      gradient.addColorStop(1,'rgba(0,0,0,'+(0.92*a)+')');
+      ctx.fillStyle=gradient;ctx.fillRect(0,start,W,H-start);
+      return;
+    }
     var g=ctx.createLinearGradient(0,600,0,H);
     g.addColorStop(0,'rgba(0,0,0,0)');
     g.addColorStop(0.55,'rgba(0,0,0,'+(0.55*a)+')');
@@ -290,6 +301,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   }
 
   function tracked(text,x,y,sp,color){
+    if(state.brand==='성수동라이프' && 'letterSpacing' in ctx){
+      var spacing=ctx.letterSpacing,kerning=ctx.fontKerning;
+      ctx.letterSpacing=sp+'px';ctx.fontKerning='none';ctx.fillStyle=color;
+      ctx.fillText(text,x,y);
+      var end=x+ctx.measureText(text).width;
+      ctx.letterSpacing=spacing;ctx.fontKerning=kerning;
+      return end;
+    }
     var cx=x;
     for(var i=0;i<text.length;i++){
       var ch=text[i];
@@ -301,7 +320,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
   function drawTitleLine(line,y){
     var seongsu=state.brand==='성수동라이프';
-    var segs=parse(line),sp=seongsu?-3.85:-70/1000*78,x=seongsu?90:78.5;
+    var segs=parse(line),sp=seongsu?-3.85:-70/1000*78,x=seongsu?92:78.5;
     ctx.font=seongsu?"700 70px 'SeongsuBold',"+BASE:fEB(78);
     segs.forEach(function(s){
       x=tracked(s.t,x,y,sp,s.hl?state.color:'#FFFFFF');
@@ -314,11 +333,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     try{ctx.letterSpacing='0px'}catch(e){}
     var lines=$('title').value.split('\n');
     var seongsu=state.brand==='성수동라이프';
-    drawTitleLine(lines[0]||'',seongsu?1003:1002.5);
-    drawTitleLine(lines[1]||'',seongsu?1096:1099.5);
+    drawTitleLine(lines[0]||'',seongsu?1011:1002.5);
+    drawTitleLine(lines[1]||'',seongsu?1104:1099.5);
     if(seongsu){
       ctx.font="36.78px 'SeongsuMedium',"+BASE;
-      tracked(state.brand+' | '+($('cat').value||''),94,1193,-1.1034,'#FFFFFF');
+      tracked(state.brand+' | '+($('cat').value||''),94,1195,-1.1034,'#FFFFFF');
       return;
     }
     var ly=state.pos==='top'?896:1196;
