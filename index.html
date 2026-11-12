@@ -73,6 +73,9 @@ input[type=range]{width:100%}
 .gradient-values{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:-2px}
 #p3 .hint{font-size:11px;margin-top:2px}
 @media(max-height:720px){.pv{height:36dvh}}
+
+#catSelect{width:100%;min-height:42px;padding:8px 10px;font:inherit;font-size:15px;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:8px}
+#cat{margin-top:8px}#p2 .style-heading{margin:12px 0 4px}
 </style>
 <!-- Pretendard font license
 Copyright (c) 2021, Kil Hyung-jin (https://github.com/orioncactus/pretendard),
@@ -202,14 +205,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   <label>메인 텍스트 (2줄, 강조할 부분은 *별표*로 감싸기)</label>
   <textarea id="title">가을도 됐는데, 공연 봐야지
 강동에 오는 *‘두 남자 이야기’*</textarea>
-  <label>분류</label>
-  <div class="row">
-    <input type="text" id="cat" value="NEWS" style="width:110px">
-    <div class="seg row" id="catSeg"><button data-v="NEWS" class="on">NEWS</button><button data-v="STORE">STORE</button><button data-v="EVENT">EVENT</button><button data-v="KIDS">KIDS</button><button data-v="FOOD">FOOD</button><button data-v="CAFE">CAFE</button><button data-v="POP-UP STORY">POP-UP STORY</button></div>
-  </div>
+  <label for="catSelect">분류</label>
+  <select id="catSelect" aria-label="분류"></select>
+  <input type="text" id="cat" value="NEWS" aria-label="분류 직접 작성" placeholder="분류를 직접 작성하세요" hidden>
+  <label class="style-heading" for="englishTrackingEnabled">영문 자간 조절<input type="checkbox" id="englishTrackingEnabled" class="toggle" role="switch"></label>
+  <div id="englishTrackingOptions" hidden>
   <label for="englishTracking">영문 자간 <output id="englishTrackingValue">0</output></label>
   <input type="range" id="englishTracking" min="-55" max="0" step="1" value="0" style="touch-action:none;height:44px">
   <div class="hint">메인·서브 텍스트의 영어 단어에만 적용됩니다. 0은 기본 간격, -55는 좁은 간격입니다.</div>
+  </div>
   <label id="posLabel">분류 위치</label>
   <div class="seg row" id="posSeg"><button data-v="top" class="on">위</button><button data-v="bottom">아래</button></div>
 </div>
@@ -241,8 +245,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
   var $=function(id){return document.getElementById(id)};
   var state={img:null,pos:'top',color:'#FF9A3C',brand:'포레온라이프',highlight:false};
-  var CATEGORIES={포레온라이프:['NEWS','STORE','EVENT','KIDS','FOOD','CAFE','POP-UP STORY'],성수동라이프:['STORY','POP-UP','CAFE','FOOD']};
+  var CATEGORIES={포레온라이프:['NEWS','STORE','EVENT','KIDS','FOOD','CAFE'],성수동라이프:['STORY','POP-UP','CAFE','FOOD']};
   var categories={포레온라이프:'NEWS',성수동라이프:'STORY'};
+  var categorySelection={포레온라이프:'NEWS',성수동라이프:'STORY'};
+  var customCategories={포레온라이프:'',성수동라이프:''};
   var opacityByBrand={포레온라이프:70,성수동라이프:60};
   var fontReady;
   var COLORS=['#FF9A3C','#FFE600','#B7F06B','#D9D4A8','#FFFFFF'];
@@ -283,16 +289,23 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     $('posSeg').style.display=seongsu?'none':'';
     refreshCategories();
   });
-  seg('catSeg',function(v){$('cat').value=v;categories[state.brand]=v});
   function refreshCategories(){
-    $('catSeg').replaceChildren();
-    CATEGORIES[state.brand].forEach(function(v){
-      var b=document.createElement('button');b.dataset.v=v;b.textContent=v;
-      b.classList.toggle('on',v===$('cat').value);$('catSeg').appendChild(b);
-    });
+    var select=$('catSelect');select.replaceChildren();
+    CATEGORIES[state.brand].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;select.appendChild(o)});
+    var custom=document.createElement('option');custom.value='__custom__';custom.textContent='직접 작성';select.appendChild(custom);
+    select.value=categorySelection[state.brand];
+    $('cat').hidden=select.value!=='__custom__';
   }
-  $('cat').style.width='100%';$('cat').placeholder='분류 직접 입력';
-  $('cat').addEventListener('input',function(){categories[state.brand]=this.value;refreshCategories()});
+  $('catSelect').addEventListener('change',function(){
+    categorySelection[state.brand]=this.value;
+    var custom=this.value==='__custom__';
+    $('cat').hidden=!custom;
+    $('cat').value=custom?customCategories[state.brand]:this.value;
+    categories[state.brand]=$('cat').value;
+    if(custom)$('cat').focus();draw();
+  });
+  $('cat').addEventListener('input',function(){customCategories[state.brand]=this.value;categories[state.brand]=this.value});
+  $('englishTrackingEnabled').addEventListener('change',function(){$('englishTrackingOptions').hidden=!this.checked;draw()});
   refreshCategories();
 
   $('resetGradient').addEventListener('click',function(){
@@ -385,7 +398,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     var size=Number((ctx.font.match(/([\d.]+)px/)||[])[1])||40;
     runs.forEach(function(run){
       var english=/^[A-Za-z]+$/.test(run);
-      var tracking=english?Number($('englishTracking').value)/1000*size:sp;
+      var tracking=english?($('englishTrackingEnabled').checked?Number($('englishTracking').value)/1000*size:0):sp;
       x=trackedRun(run,x,y,tracking,color);
       // Only spacing inside an English word changes; keep its boundary gap.
       if(english)x+=sp-tracking;
