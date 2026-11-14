@@ -66,9 +66,9 @@ input[type=range]{width:100%}
 .dual-fill{position:absolute;left:var(--start);right:calc(100% - var(--end));height:100%;background:var(--ac)}
 #p3 .dual-range input{position:absolute;inset:0;width:100%;margin:0;pointer-events:none;appearance:none;-webkit-appearance:none;background:transparent;border:0}
 .dual-range input::-webkit-slider-runnable-track{height:4px;background:transparent}
-.dual-range input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;pointer-events:auto;width:24px;height:24px;margin-top:-10px;border-radius:50%;background:var(--card);border:2px solid var(--ac);box-shadow:0 1px 3px #0003}
+.dual-range input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;pointer-events:none;width:24px;height:24px;margin-top:-10px;border-radius:50%;background:var(--card);border:2px solid var(--ac);box-shadow:0 1px 3px #0003}
 .dual-range input::-moz-range-track{height:4px;background:transparent}
-.dual-range input::-moz-range-thumb{pointer-events:auto;width:21px;height:21px;border-radius:50%;background:var(--card);border:2px solid var(--ac)}
+.dual-range input::-moz-range-thumb{pointer-events:none;width:21px;height:21px;border-radius:50%;background:var(--card);border:2px solid var(--ac)}
 .dual-range input:focus-visible{outline:none}.dual-range input:focus-visible::-webkit-slider-thumb{outline:2px solid var(--tx);outline-offset:2px}
 .gradient-values{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:-2px}
 #p3 .hint{font-size:11px;margin-top:2px}
@@ -76,6 +76,7 @@ input[type=range]{width:100%}
 
 #catSelect{width:100%;min-height:42px;padding:8px 10px;font:inherit;font-size:15px;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:8px}
 #cat{margin-top:8px}#p2 .style-heading{margin:12px 0 4px}
+#shadeRange{height:44px;touch-action:none}#shadeRange input{pointer-events:none}#shadeRange input::-webkit-slider-thumb{pointer-events:none}#shadeRange input::-moz-range-thumb{pointer-events:none}
 </style>
 <!-- Pretendard font license
 Copyright (c) 2021, Kil Hyung-jin (https://github.com/orioncactus/pretendard),
@@ -230,7 +231,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     </div>
     <div class="gradient-values"><span>시작 <output id="shadeStartValue">840px</output></span><span>끝 <output id="shadeEndValue">1005px</output></span></div>
   </div>
-  <label><span id="shadeLabel">하단 어둡기</span> <output id="shadeValue">70%</output></label><input type="range" id="shade" min="0" max="100" value="70">
+  <label><span id="shadeLabel">하단 어둡기</span> <output id="shadeValue">70%</output></label><div id="shadeRange"><input type="range" id="shade" min="0" max="100" value="70"></div>
 </div>
 
 <div id="outWrap">
@@ -318,27 +319,40 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       else this.value=Number($('shadeStart').value)+1;
     }
   })});
-  // Capture dragging inside the panel, away from the iPhone screen edges.
-  ['shade','shadeStart','shadeEnd'].forEach(function(id){
-    $(id).addEventListener('touchmove',function(e){e.preventDefault()},{passive:false});
-  });
-  $('gradientRange').addEventListener('pointerdown',function(e){
-    if(e.target.tagName==='INPUT')return;
-    e.preventDefault();
-    var box=this.getBoundingClientRect();
-    var value=Math.max(0,Math.min(1350,Math.round((e.clientX-box.left-12)/(box.width-24)*1350)));
-    var id=Math.abs(value-Number($('shadeStart').value))<Math.abs(value-Number($('shadeEnd').value))?'shadeStart':'shadeEnd';
-    var input=$(id);input.focus();
-    function move(event){
-      var n=Math.max(0,Math.min(1350,Math.round((event.clientX-box.left-12)/(box.width-24)*1350)));
-      input.value=id==='shadeStart'?Math.min(n,Number($('shadeEnd').value)-1):Math.max(n,Number($('shadeStart').value)+1);
-      input.dispatchEvent(new Event('input',{bubbles:true}));
-    }
-    move(e);this.setPointerCapture(e.pointerId);
-    this.addEventListener('pointermove',move);
-    var range=this;
-    function stop(){range.removeEventListener('pointermove',move);range.removeEventListener('pointerup',stop);range.removeEventListener('pointercancel',stop)}
-    this.addEventListener('pointerup',stop);this.addEventListener('pointercancel',stop);
+  // Drive range values from pointer events instead of canceling native touchmove.
+  // Pointer capture keeps dragging active when the finger leaves the control.
+  function bindRangePointer(element,selectInput){
+    element.addEventListener('pointerdown',function(e){
+      if(e.isPrimary===false || (e.pointerType==='mouse' && e.button!==0))return;
+      e.preventDefault();
+      var box=element.getBoundingClientRect();
+      function fraction(event){return Math.max(0,Math.min(1,(event.clientX-box.left-12)/Math.max(1,box.width-24)))}
+      var input=selectInput(fraction(e));input.focus({preventScroll:true});
+      function move(event){
+        var min=Number(input.min),max=Number(input.max),step=Number(input.step)||1;
+        var value=min+Math.round(fraction(event)*(max-min)/step)*step;
+        if(input.id==='shadeStart')value=Math.min(value,Number($('shadeEnd').value)-1);
+        if(input.id==='shadeEnd')value=Math.max(value,Number($('shadeStart').value)+1);
+        input.value=Math.max(min,Math.min(max,value));
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+      function update(event){if(event.pointerId===e.pointerId)move(event)}
+      function stop(event){
+        if(event.pointerId!==e.pointerId)return;
+        element.removeEventListener('pointermove',update);
+        element.removeEventListener('pointerup',stop);element.removeEventListener('pointercancel',stop);element.removeEventListener('lostpointercapture',stop);
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+      element.setPointerCapture(e.pointerId);
+      element.addEventListener('pointermove',update);
+      element.addEventListener('pointerup',stop);element.addEventListener('pointercancel',stop);element.addEventListener('lostpointercapture',stop);
+      move(e);
+    });
+  }
+  bindRangePointer($('shadeRange'),function(){return $('shade')});
+  bindRangePointer($('gradientRange'),function(fraction){
+    var value=fraction*1350;
+    return Math.abs(value-Number($('shadeStart').value))<Math.abs(value-Number($('shadeEnd').value))?$('shadeStart'):$('shadeEnd');
   });
   ['title','cat','zoom','px','py','shade','shadeStart','shadeEnd','englishTracking'].forEach(function(id){$(id).addEventListener('input',draw)});
 
