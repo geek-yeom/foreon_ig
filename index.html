@@ -77,6 +77,7 @@ input[type=range]{width:100%}
 #catSelect{width:100%;min-height:42px;padding:8px 10px;font:inherit;font-size:15px;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:8px}
 #cat{margin-top:8px}#p2 .style-heading{margin:12px 0 4px}
 #shadeRange{height:44px;touch-action:none}#shadeRange input{pointer-events:none}#shadeRange input::-webkit-slider-thumb{pointer-events:none}#shadeRange input::-moz-range-thumb{pointer-events:none}
+.cartoon-tools{margin:8px 0}.cartoon-tools .btn{padding:7px 9px;font-size:12px}.cartoon-tools .main{width:auto;flex:1}.cartoon-tools [aria-pressed=true]{background:var(--tx);color:var(--bg)}.cartoon-check{display:flex;align-items:center;gap:4px;margin:0;font-size:12px}.cartoon-settings{flex-wrap:nowrap;align-items:flex-end}.cartoon-settings label{flex:1;min-width:0}.cartoon-settings select,#cartoonBoxSelect{font:inherit;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--tx);padding:7px}.cartoon-settings select{width:100%}.cartoon-color{display:flex;align-items:center;gap:10px}#cartoonPalette{gap:7px}#p4{overscroll-behavior:contain;padding-bottom:24px}#p4 input[type=range]{touch-action:none}button:disabled{opacity:.45;cursor:default}
 </style>
 <!-- Pretendard font license
 Copyright (c) 2021, Kil Hyung-jin (https://github.com/orioncactus/pretendard),
@@ -192,7 +193,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 <div class="pv"><canvas id="cv" width="1080" height="1350"></canvas></div>
 
-<div class="tabs" id="tabs"><button data-t="p1" class="on">이미지</button><button data-t="p2">텍스트</button><button data-t="p3">스타일</button></div>
+<div class="tabs" id="tabs"><button data-t="p1" class="on">이미지</button><button data-t="p2">텍스트</button><button data-t="p3">스타일</button><button data-t="p4">카툰</button></div>
 
 <div class="panel on" id="p1">
   <label>배경 이미지</label>
@@ -232,6 +233,23 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <div class="gradient-values"><span>시작 <output id="shadeStartValue">840px</output></span><span>끝 <output id="shadeEndValue">1005px</output></span></div>
   </div>
   <label><span id="shadeLabel">하단 어둡기</span> <output id="shadeValue">70%</output></label><div id="shadeRange"><input type="range" id="shade" min="0" max="100" value="70"></div>
+</div>
+
+<div class="panel" id="p4">
+  <label for="cartoonFile">1. 이미지 불러오기</label><input type="file" id="cartoonFile" accept="image/*">
+  <div class="hint" id="cartoonStatus" role="status">사진을 불러온 뒤 미리보기에서 직접 이동하세요. 저장 크기 1080 × 1350.</div>
+  <div class="row cartoon-tools"><button class="btn" id="cartoonPhotoMode" aria-pressed="true">사진 이동</button><button class="btn" id="cartoonBoxMode" aria-pressed="false">박스 이동</button><label class="cartoon-check"><input type="checkbox" id="cartoonSnap" checked> 스냅</label><button class="btn" id="cartoonCenter">가운데</button></div>
+  <label for="cartoonZoom">2. 이미지 확대 <output id="cartoonZoomValue">100%</output></label><input type="range" id="cartoonZoom" min="100" max="300" value="100" style="touch-action:none;height:36px">
+  <label for="cartoonText">3. 설명 텍스트 · *별표*로 굵게 강조</label><textarea id="cartoonText" maxlength="1000" placeholder="설명을 입력하세요. 줄바꿈도 가능합니다."></textarea>
+  <div class="row cartoon-tools"><button class="btn main" id="cartoonAdd">4. 텍스트 박스 생성</button><button class="btn" id="cartoonDraft">새 텍스트</button></div>
+  <div id="cartoonBoxOptions" hidden>
+    <div class="row cartoon-tools"><select id="cartoonBoxSelect" aria-label="편집할 박스"></select><button class="btn" id="cartoonDelete">박스 삭제</button></div>
+    <div class="row cartoon-settings"><label>박스 너비 <input type="range" id="cartoonWidth" min="20" max="90" value="46"></label><label>글자 크기 <input type="range" id="cartoonFont" min="22" max="64" value="34"></label></div>
+    <label>5. 박스 색상 · 사진에서 추천</label><div class="row" id="cartoonPalette"></div>
+    <label class="cartoon-color">직접 선택 <input type="color" id="cartoonFill" value="#850b0b"></label>
+    <div class="row cartoon-settings"><label>테두리 <select id="cartoonBorder"><option value="#ffffff">화이트</option><option value="#000000">블랙</option></select></label><label>텍스트 <select id="cartoonInk"><option value="#ffffff">화이트</option><option value="#000000">블랙</option></select></label></div>
+    <div class="hint">미리보기에서 박스를 드래그하세요. 텍스트를 수정하면 선택한 박스에 바로 반영됩니다. 새 박스는 생성 버튼으로 추가하세요.</div>
+  </div>
 </div>
 
 <div id="outWrap">
@@ -448,6 +466,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   }
 
   function draw(){
+    if(cartoon&&cartoon.active){cartoon.draw();return}
+    ctx.fontKerning="auto";$('save').disabled=false;$('make').disabled=false;
     $('englishTrackingValue').value=$('englishTracking').value;
     $('save').textContent=state.img?'이미지 저장':'투명 PNG 저장';
     $('gradientRange').style.setProperty('--start',(Number($('shadeStart').value)/1350*100)+'%');
@@ -472,15 +492,108 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     tracked($('cat').value||'',303,ly,0,'#FFFFFF');
   }
 
+  function createCartoon(){
+    var tool={active:false},photo=null,zoom=1,ox=0,oy=0,boxes=[],selected=-1,mode='photo',guides=[],sequence=0;
+    var palette=['#850b0b','#ffffff','#000000'],pointer=null,pending=0;
+    var clamp=function(n,a,b){return Math.max(a,Math.min(b,n))};
+    function status(t){$('cartoonStatus').textContent=t}
+    function current(){return boxes.find(function(b){return b.id===selected})}
+    function setMode(v){mode=v;$('cartoonPhotoMode').setAttribute('aria-pressed',String(v==='photo'));$('cartoonBoxMode').setAttribute('aria-pressed',String(v==='box'))}
+    function font(size,bold){return bold?"700 "+size+"px 'SeongsuBold',"+BASE:size+"px 'SeongsuMedium',"+BASE}
+    function layout(b,size){
+      size=size||b.size;
+      var pad=40,limit=b.w-pad*2,lines=[[]],width=0;
+      b.text.split('\n').forEach(function(paragraph,pi){
+        if(pi){lines.push([]);width=0}
+        parse(paragraph).forEach(function(run){Array.from(run.t).forEach(function(ch){
+          ctx.font=font(size,run.hl);var w=ctx.measureText(ch).width;
+          if(width+w>limit&&lines[lines.length-1].length){lines.push([]);width=0}
+          lines[lines.length-1].push({ch:ch,bold:run.hl,w:w});width+=w;
+        })});
+      });
+      b.h=pad*2+lines.length*size*1.3;
+      if(b.h>H-40&&size>10)return layout(b,size-1);
+      b.renderSize=size;
+      b.y=clamp(b.y,0,Math.max(0,H-b.h));
+      return lines;
+    }
+    function drawBox(b){
+      var lines=layout(b);ctx.fillStyle=b.fill;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle=b.border;ctx.lineWidth=2;ctx.strokeRect(b.x+1,b.y+1,b.w-2,b.h-2);
+      ctx.fillStyle=b.ink;ctx.textBaseline='alphabetic';ctx.textAlign='left';ctx.letterSpacing='0px';
+      lines.forEach(function(line,index){var x=b.x+40,y=b.y+40+b.renderSize+(index*b.renderSize*1.3);line.forEach(function(g){ctx.font=font(b.renderSize,g.bold);ctx.fillText(g.ch,x,y);x+=g.w})});
+    }
+    function sync(){
+      var b=current();$('cartoonBoxOptions').hidden=!b;
+      $('cartoonBoxSelect').replaceChildren();boxes.forEach(function(box,i){var o=document.createElement('option');o.value=box.id;o.textContent='박스 '+(i+1);$('cartoonBoxSelect').appendChild(o)});
+      if(b){$('cartoonBoxSelect').value=b.id;$('cartoonText').value=b.text;$('cartoonWidth').value=b.w/W*100;$('cartoonFont').value=b.size;$('cartoonFill').value=b.fill;$('cartoonBorder').value=b.border;$('cartoonInk').value=b.ink}
+      $('cartoonZoomValue').value=Math.round(zoom*100)+'%';$('cartoonZoom').value=zoom*100;
+    }
+    function render(){if(tool.active)draw()}
+    function refreshPalette(){
+      $('cartoonPalette').replaceChildren();palette.forEach(function(color){var button=document.createElement('button');button.className='sw';button.style.background=color;button.setAttribute('aria-label','박스 색상 '+color);button.onclick=function(){var b=current();if(b){b.fill=color;$('cartoonFill').value=color;render()}};$('cartoonPalette').appendChild(button)});
+    }
+    function extract(im){
+      var sample=document.createElement('canvas');sample.width=80;sample.height=80;var c=sample.getContext('2d',{willReadFrequently:true});c.drawImage(im,0,0,80,80);var data=c.getImageData(0,0,80,80).data,bins={};
+      for(var i=0;i<data.length;i+=4){if(data[i+3]<128)continue;var r=data[i],g=data[i+1],b=data[i+2],max=Math.max(r,g,b),min=Math.min(r,g,b);if(max<25||min>240)continue;var key=(r>>5)+','+(g>>5)+','+(b>>5);var bin=bins[key]||(bins[key]={r:0,g:0,b:0,n:0});bin.r+=r;bin.g+=g;bin.b+=b;bin.n++}
+      var ranked=Object.keys(bins).map(function(k){return bins[k]}).sort(function(a,b){return b.n-a.n}),colors=[];
+      ranked.forEach(function(bin){var rgb=[bin.r,bin.g,bin.b].map(function(v){return Math.round(v/bin.n)});if(colors.length<5&&!colors.some(function(old){return rgb.reduce(function(s,v,i){return s+(v-old[i])*(v-old[i])},0)<2500}))colors.push(rgb)});
+      palette=['#850b0b'].concat(colors.map(function(rgb){return '#'+rgb.map(function(v){return v.toString(16).padStart(2,'0')}).join('')})).concat(['#ffffff','#000000']);refreshPalette();
+    }
+    $('cartoonFile').addEventListener('change',function(){
+      var file=this.files&&this.files[0];if(!file)return;var token=++pending,url=URL.createObjectURL(file),im=new Image();
+      status('이미지를 불러오는 중입니다…');
+      im.onload=function(){URL.revokeObjectURL(url);if(token!==pending)return;photo=im;zoom=1;ox=oy=0;setMode('photo');sync();extract(im);status('사진을 드래그해 이동하세요. 박스는 그대로 유지됩니다.');render()};
+      im.onerror=function(){URL.revokeObjectURL(url);if(token===pending)status('이미지를 열 수 없습니다. JPG·PNG 파일로 다시 선택해 주세요.')};im.src=url;
+    });
+    $('cartoonPhotoMode').onclick=function(){setMode('photo')};$('cartoonBoxMode').onclick=function(){setMode('box')};
+    $('cartoonZoom').addEventListener('input',function(){zoom=Number(this.value)/100;constrainPhoto();sync();render()});
+    function constrainPhoto(){if(!photo)return;var s=Math.max(W/photo.width,H/photo.height)*zoom;ox=clamp(ox,-(photo.width*s-W)/2,(photo.width*s-W)/2);oy=clamp(oy,-(photo.height*s-H)/2,(photo.height*s-H)/2)}
+    $('cartoonCenter').onclick=function(){if(mode==='box'&&current()){var b=current();layout(b);b.x=(W-b.w)/2;b.y=(H-b.h)/2}else{ox=oy=0}render()};
+    $('cartoonAdd').onclick=function(){
+      if(!photo){status('먼저 이미지를 불러와 주세요.');return}
+      var text=$('cartoonText').value.trim();if(!text){status('박스에 넣을 텍스트를 입력해 주세요.');$('cartoonText').focus();return}
+      var previous=current(),b={id:++sequence,text:text,w:500,h:150,size:34,x:110,y:250,fill:previous?previous.fill:'#850b0b',border:previous?previous.border:'#ffffff',ink:previous?previous.ink:'#ffffff'};
+      b.y+=boxes.length*40;boxes.push(b);selected=b.id;setMode('box');sync();status('박스를 드래그해 이동하세요. *별표*로 감싼 부분은 굵게 표시됩니다.');render();
+    };
+    $('cartoonDraft').onclick=function(){selected=-1;sync();$('cartoonText').value='';$('cartoonText').focus();status('새 설명을 입력한 뒤 텍스트 박스 생성 버튼을 누르세요.');render()};
+    $('cartoonText').addEventListener('input',function(){var b=current();if(b){b.text=this.value;render()}});
+    $('cartoonBoxSelect').onchange=function(){selected=Number(this.value);setMode('box');sync();render()};
+    $('cartoonDelete').onclick=function(){boxes=boxes.filter(function(b){return b.id!==selected});selected=boxes.length?boxes[boxes.length-1].id:-1;sync();if(!boxes.length)$('cartoonText').value='';render()};
+    [['cartoonWidth','w'],['cartoonFont','size'],['cartoonFill','fill'],['cartoonBorder','border'],['cartoonInk','ink']].forEach(function(pair){$(pair[0]).addEventListener('input',function(){var b=current();if(!b)return;b[pair[1]]=pair[0]==='cartoonWidth'?Number(this.value)/100*W:pair[0]==='cartoonFont'?Number(this.value):this.value;b.x=clamp(b.x,0,W-b.w);render()})});
+    function point(e){var r=cv.getBoundingClientRect(),scale=Math.min(r.width/W,r.height/H);return {x:(e.clientX-r.left-(r.width-W*scale)/2)/scale,y:(e.clientY-r.top-(r.height-H*scale)/2)/scale}}
+    function snap(value,size,total){if(!$('cartoonSnap').checked)return value;var targets=[0,(total-size)/2,total-size];for(var i=0;i<targets.length;i++){if(Math.abs(value-targets[i])<16){guides.push({axis:total===W?'x':'y',value:targets[i]+(i===1?size/2:i===2?size:0)});return targets[i]}}return value}
+    cv.addEventListener('pointerdown',function(e){
+      if(!tool.active||!photo||e.isPrimary===false)return;e.preventDefault();var p=point(e),b=null;
+      if(mode==='box'){for(var i=boxes.length-1;i>=0;i--){var box=boxes[i];if(p.x>=box.x&&p.x<=box.x+box.w&&p.y>=box.y&&p.y<=box.y+box.h){b=box;break}}if(!b)return;selected=b.id;sync()}
+      pointer={id:e.pointerId,p:p,box:b,x:b?b.x:ox,y:b?b.y:oy};cv.setPointerCapture(e.pointerId);
+    });
+    cv.addEventListener('pointermove',function(e){if(!tool.active||!pointer||e.pointerId!==pointer.id)return;var p=point(e),x=pointer.x+p.x-pointer.p.x,y=pointer.y+p.y-pointer.p.y;guides=[];
+      if(pointer.box){var b=pointer.box;b.x=clamp(snap(x,b.w,W),0,W-b.w);b.y=clamp(snap(y,b.h,H),0,Math.max(0,H-b.h))}else{ox=x;oy=y;if($('cartoonSnap').checked){if(Math.abs(ox)<16){ox=0;guides.push({axis:'x',value:W/2})}if(Math.abs(oy)<16){oy=0;guides.push({axis:'y',value:H/2})}}constrainPhoto()}render();
+    });
+    function finish(){pointer=null;guides=[];render()}
+    cv.addEventListener('pointerup',finish);cv.addEventListener('pointercancel',finish);cv.addEventListener('lostpointercapture',finish);
+    tool.finish=finish;
+    tool.setActive=function(active){tool.active=active;cv.style.touchAction=active?'none':'';$('modeSeg').hidden=active;document.querySelector('.top h1').textContent=active?'카툰 이미지 편집':state.brand+' 커버 생성기';document.title=document.querySelector('.top h1').textContent;render()};
+    tool.draw=function(){
+      ctx.clearRect(0,0,W,H);ctx.letterSpacing='0px';ctx.fontKerning='none';ctx.globalAlpha=1;
+      if(photo){var s=Math.max(W/photo.width,H/photo.height)*zoom;ctx.drawImage(photo,(W-photo.width*s)/2+ox,(H-photo.height*s)/2+oy,photo.width*s,photo.height*s)}
+      boxes.forEach(drawBox);
+      if(guides.length){ctx.save();ctx.strokeStyle='#16c8ff';ctx.lineWidth=2;ctx.setLineDash([8,8]);guides.forEach(function(g){ctx.beginPath();if(g.axis==='x'){ctx.moveTo(g.value,0);ctx.lineTo(g.value,H)}else{ctx.moveTo(0,g.value);ctx.lineTo(W,g.value)}ctx.stroke()});ctx.restore()}
+      $('save').disabled=!photo;$('make').disabled=!photo;$('save').textContent='카툰 PNG 저장';
+    };
+    refreshPalette();return tool;
+  }
+
+  var cartoon=createCartoon();
   fontReady=Promise.all([document.fonts.load("72px 'NeoEB'",'가'),document.fonts.load("36px 'NeoSB'",'가'),document.fonts.load("700 70px 'SeongsuBold'",'가'),document.fonts.load("36.78px 'SeongsuMedium'",'성수동라이프')]).then(draw,draw);
   draw();
 
 
   $('save').addEventListener('click',async function(){
-    await fontReady;draw();
+    await fontReady;if(cartoon.active)cartoon.finish();draw();
     cv.toBlob(function(blob){
       if(!blob){$('make').click();return}
-      var name=(state.brand==='성수동라이프'?'seongsu':'foreon')+(state.img?'-cover-':'-transparent-')+Date.now()+'.png';
+      var name=(cartoon.active?'cartoon':state.brand==='성수동라이프'?'seongsu':'foreon')+(cartoon.active||state.img?'-cover-':'-transparent-')+Date.now()+'.png';
       if(!window.claude||!claude.use){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},60000);return}
       claude.use('downloads').then(function(d){
         if(!d){$('make').click();return}
@@ -497,11 +610,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   $('tabs').addEventListener('click',function(e){
     var b=e.target.closest('button');if(!b)return;
     [].forEach.call($('tabs').children,function(x){x.classList.remove('on')});b.classList.add('on');
-    ['p1','p2','p3'].forEach(function(id){$(id).classList.toggle('on',id===b.dataset.t)});
+    ['p1','p2','p3','p4'].forEach(function(id){$(id).classList.toggle('on',id===b.dataset.t)});
+    cartoon.setActive(b.dataset.t==='p4');draw();
   });
 
   $('make').addEventListener('click',async function(){
-    await fontReady;draw();
+    await fontReady;if(cartoon.active)cartoon.finish();draw();
     var o=$('out');o.src=cv.toDataURL('image/png');o.style.display='block';
     $('outWrap').style.display='block';
     
